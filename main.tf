@@ -7,7 +7,7 @@
  *
  *```
  *module "asg" {
- *  source = "git@github.com:rackspace-infrastructure-automation/aws-terraform-ec2_asg//?ref=v0.0.11"
+ *  source = "git::https://github.com/scafeman/aws-terraform-ec2_asg//?ref=v0.0.11"
  *
  *  ec2_os              = "amazon"
  *  subnets             = ["${module.vpc.private_subnets}"]
@@ -552,7 +552,7 @@ data "null_data_source" "alarm_dimensions" {
 }
 
 module "group_terminating_instances" {
-  source = "git@github.com:rackspace-infrastructure-automation/aws-terraform-cloudwatch_alarm//?ref=v0.0.1"
+  source = "git::https://github.com/scafeman/aws-terraform-cloudwatch_alarm//?ref=v0.0.1"
 
   alarm_count              = "${var.asg_count}"
   alarm_description        = "Over ${var.terminated_instances} instances terminated in last 6 hours, generating ticket to investigate."
