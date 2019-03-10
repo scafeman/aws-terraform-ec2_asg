@@ -20,9 +20,6 @@
  * Full working references are available at [examples](examples)
  */
 
-locals {
-  cw_config_parameter_name = "CWAgent-${var.resource_name}"
-
 # Lookup the correct AMI based on the region specified
 data "aws_ami" "asg_ami" {
   most_recent = true
