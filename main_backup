@@ -541,6 +541,84 @@ resource "aws_autoscaling_notification" "rs_support_emergency" {
 }
 
 #
+# Provisioning of CloudWatch related resources
+#
+data "null_data_source" "alarm_dimensions" {
+  count = "${var.asg_count}"
+
+  inputs = {
+    AutoScalingGroupName = "${element(aws_autoscaling_group.autoscalegrp.*.name, count.index)}"
+  }
+}
+
+module "group_terminating_instances" {
+  source = "git::https://github.com/scafeman/aws-terraform-cloudwatch_alarm//?ref=v0.0.1"
+
+  alarm_count              = "${var.asg_count}"
+  alarm_description        = "Over ${var.terminated_instances} instances terminated in last 6 hours, generating ticket to investigate."
+  alarm_name               = "${var.resource_name}-GroupTerminatingInstances}"
+  comparison_operator      = "GreaterThanThreshold"
+  dimensions               = "${data.null_data_source.alarm_dimensions.*.outputs}"
+  evaluation_periods       = 1
+  metric_name              = "GroupTerminatingInstances"
+  namespace                = "AWS/AutoScaling"
+  notification_topic       = "${var.notification_topic}"
+  period                   = 21600
+  rackspace_alarms_enabled = "${var.rackspace_alarms_enabled}"
+  rackspace_managed        = "${var.rackspace_managed}"
+  severity                 = "emergency"
+  statistic                = "Sum"
+  threshold                = "${var.terminated_instances}"
+  unit                     = "Count"
+}
+
+resource "aws_cloudwatch_metric_alarm" "scale_alarm_high" {
+  alarm_name          = "${join("-",compact(list("ScaleAlarmHigh", var.resource_name, format("%03d",count.index+1))))}"
+  alarm_description   = "Scale-up if ${var.cw_scaling_metric} ${var.cw_high_operator} ${var.cw_high_threshold}% for ${var.cw_high_period} seconds ${var.cw_high_evaluations} times."
+  count               = "${var.asg_count}"
+  namespace           = "AWS/EC2"
+  period              = "${var.cw_high_period}"
+  comparison_operator = "${var.cw_high_operator}"
+  statistic           = "Average"
+  threshold           = "${var.cw_high_threshold}"
+  metric_name         = "${var.cw_scaling_metric}"
+  evaluation_periods  = "${var.cw_high_evaluations}"
+  alarm_actions       = ["${element(aws_autoscaling_policy.ec2_scale_up_policy.*.arn, count.index)}"]
+
+  dimensions {
+    AutoScalingGroupName = "${element(aws_autoscaling_group.autoscalegrp.*.name, count.index)}"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "scale_alarm_low" {
+  alarm_name          = "${join("-",compact(list("ScaleAlarmLow", var.resource_name, format("%03d",count.index+1))))}"
+  alarm_description   = "Scale-down if ${var.cw_scaling_metric} ${var.cw_low_operator} ${var.cw_low_threshold}% for ${var.cw_low_period} seconds ${var.cw_low_evaluations} times."
+  count               = "${var.asg_count}"
+  namespace           = "AWS/EC2"
+  period              = "${var.cw_low_period}"
+  comparison_operator = "${var.cw_low_operator}"
+  statistic           = "Average"
+  threshold           = "${var.cw_low_threshold}"
+  metric_name         = "${var.cw_scaling_metric}"
+  evaluation_periods  = "${var.cw_low_evaluations}"
+  alarm_actions       = ["${element(aws_autoscaling_policy.ec2_scale_down_policy.*.arn, count.index)}"]
+
+  dimensions {
+    AutoScalingGroupName = "${element(aws_autoscaling_group.autoscalegrp.*.name, count.index)}"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "system_logs" {
+  name              = "${var.resource_name}-SystemsLogs"
+  retention_in_days = "${var.cloudwatch_log_retention}"
+}
+
+resource "aws_cloudwatch_log_group" "application_logs" {
+  name              = "${var.resource_name}-ApplicationLogs"
+  retention_in_days = "${var.cloudwatch_log_retention}"
+}
+
+#
 # Provisioning of SSM related resources
 #
 
